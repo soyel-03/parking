@@ -4,6 +4,7 @@ import com.decathlon.parking.model.ParkingRecord;
 import com.decathlon.parking.model.ParkingSettings;
 import com.decathlon.parking.repo.ParkingRecordRepository;
 import com.decathlon.parking.repo.ParkingSettingsRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ public class ParkingService {
     private final ParkingRecordRepository repo;
     private final ParkingSettingsRepository settingsRepo;
     private final String storageMode;
+    private final Object settingsLock = new Object();
 
     public ParkingService(
         ParkingRecordRepository repo,
@@ -35,15 +37,26 @@ public class ParkingService {
             : "h2";
     }
 
+    @PostConstruct
+    void initSettings() {
+        getOrCreateSettings();
+    }
+
     private ParkingSettings getOrCreateSettings() {
-        return settingsRepo.findById(SETTINGS_ID).orElseGet(() -> {
-            ParkingSettings defaults = new ParkingSettings();
-            defaults.setId(SETTINGS_ID);
-            defaults.setCarRatePerHour(new BigDecimal("30.00"));
-            defaults.setBikeRatePerHour(new BigDecimal("15.00"));
-            defaults.setUpdatedAt(LocalDateTime.now());
-            return settingsRepo.save(defaults);
-        });
+        Optional<ParkingSettings> existing = settingsRepo.findById(SETTINGS_ID);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        synchronized (settingsLock) {
+            return settingsRepo.findById(SETTINGS_ID).orElseGet(() -> {
+                ParkingSettings defaults = new ParkingSettings();
+                defaults.setId(SETTINGS_ID);
+                defaults.setCarRatePerHour(new BigDecimal("30.00"));
+                defaults.setBikeRatePerHour(new BigDecimal("15.00"));
+                defaults.setUpdatedAt(LocalDateTime.now());
+                return settingsRepo.saveAndFlush(defaults);
+            });
+        }
     }
 
     @Transactional

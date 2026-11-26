@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decathlon | Smart Parking</title>
+<style>
+:root{--blue:#087ac1;--navy:#102d46;--ink:#183247;--muted:#6d7f8d;--bg:#f3f7fa;--line:#e4edf2;--green:#16845b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,Arial,sans-serif;color:var(--ink)}
+header{background:var(--navy);color:white;padding:18px 5%;display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:21px;font-weight:850;letter-spacing:.5px}.brand span{color:#61c3ff}.sub{font-size:12px;color:#c6d8e5;margin-top:4px}
+main{max-width:1240px;margin:28px auto;padding:0 20px}.top{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:20px}
+h1{font-size:27px;margin:0 0 6px}.muted{color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.card{background:white;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 4px 16px #18324708}
+.stat-label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}.stat{font-size:29px;font-weight:800;margin-top:8px}.stat-note{font-size:12px;color:var(--muted);margin-top:4px}
+.columns{display:grid;grid-template-columns:360px 1fr;gap:18px}.card h2{font-size:17px;margin:0 0 16px}
+label{display:block;font-size:12px;font-weight:700;color:#526777;margin:12px 0 6px}
+input,select{width:100%;border:1px solid #d8e3e9;border-radius:8px;padding:11px 12px;font:inherit;color:var(--ink);background:white}
+button{border:0;border-radius:8px;padding:11px 15px;background:var(--blue);color:white;font-weight:750;cursor:pointer}
+button:hover{filter:brightness(.94)}button.secondary{background:#eaf4fa;color:var(--blue)}button.small{padding:7px 10px;font-size:12px}
+form button{width:100%;margin-top:17px}.rates{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#708391;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:11px 8px;border-bottom:1px solid var(--line)}
+td{padding:13px 8px;border-bottom:1px solid #edf2f5}tr:last-child td{border-bottom:0}
+.pill{display:inline-block;background:#e7f7ef;color:#14744f;padding:5px 8px;border-radius:30px;font-size:11px;font-weight:800}
+.empty{text-align:center;color:var(--muted);padding:35px 10px}.table-wrap{overflow:auto}
+.toast{position:fixed;right:20px;bottom:20px;background:#16364e;color:white;padding:13px 17px;border-radius:10px;box-shadow:0 8px 30px #0002;display:none;max-width:360px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.columns{grid-template-columns:1fr}}
+@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.top{align-items:start;flex-direction:column}main{padding:0 12px}.card{padding:14px}}
+</style>
+</head>
+<body>
+<header><div><div class="brand"><span>DECATHLON</span> SMART PARKING</div><div class="sub">Parking operations dashboard</div></div><div class="sub" id="clock"></div></header>
+<main>
+<div class="top"><div><h1>Parking overview</h1><div class="muted">Live occupancy, vehicle entry and exit management</div></div><button class="secondary" onclick="refreshAll()">↻ Refresh data</button></div>
+<section class="grid">
+ <div class="card"><div class="stat-label">Cars parked</div><div class="stat" id="cars">—</div><div class="stat-note" id="carAvail">Loading capacity…</div></div>
+ <div class="card"><div class="stat-label">Bikes parked</div><div class="stat" id="bikes">—</div><div class="stat-note" id="bikeAvail">Loading capacity…</div></div>
+ <div class="card"><div class="stat-label">Total vehicles</div><div class="stat" id="total">—</div><div class="stat-note">Currently inside parking</div></div>
+ <div class="card"><div class="stat-label">Parking capacity</div><div class="stat" id="capacity">50</div><div class="stat-note">30 car spaces · 20 bike spaces</div></div>
+</section>
+<div class="columns">
+ <section class="card">
+  <h2>Register vehicle entry</h2>
+  <form id="entryForm">
+   <label>Vehicle type</label><select id="vehicleType"><option value="CAR">Car</option><option value="BIKE">Bike</option></select>
+   <label>Vehicle brand</label><input id="brand" placeholder="e.g. Hyundai" required>
+   <label>Model</label><input id="model" placeholder="e.g. Creta" required>
+   <label>Number plate</label><input id="plate" placeholder="e.g. WB 02 AB 1234" maxlength="20" required>
+   <button type="submit">Allocate parking slot</button>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--line);margin:22px 0">
+  <h2>Hourly parking rates (₹)</h2>
+  <form id="rateForm">
+   <div class="rates"><div><label>Car / hour</label><input id="carRate" type="number" min="0" step=".01" required></div><div><label>Bike / hour</label><input id="bikeRate" type="number" min="0" step=".01" required></div></div>
+   <button class="secondary" type="submit">Update rates</button>
+  </form>
+  <p class="muted" style="font-size:11px;line-height:1.5">Billing rounds up to the next hour, with a one-hour minimum. Rate changes apply to new checkout calculations.</p>
+ </section>
+ <section class="card">
+  <div class="toolbar"><div><h2 style="margin:0">Vehicles currently parked</h2><div class="muted" style="margin-top:5px">Live timer starts from recorded entry time</div></div><span class="pill" id="activeCount">0 ACTIVE</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Vehicle</th><th>Number plate</th><th>Slot</th><th>Entry time</th><th>Duration</th><th>Action</th></tr></thead><tbody id="vehicleRows"><tr><td colspan="6" class="empty">Loading vehicles…</td></tr></tbody></table></div>
+ </section>
+</div>
+</main><div class="toast" id="toast"></div>
+<script>
+const money = n => '₹' + Number(n).toFixed(2);
+let toastTimer;
+function notify(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display='none',3800)}
+function duration(iso){const mins=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/60000));return `${Math.floor(mins/60)}h ${mins%60}m`}
+async function api(url,opts={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...opts});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||'Request failed');return data}
+async function refreshAll(){
+ try{
+  const [d,vehicles,rates]=await Promise.all([api('/api/dashboard'),api('/api/parking/active'),api('/api/settings/rates')]);
+  document.getElementById('cars').textContent=d.parkedCars;document.getElementById('bikes').textContent=d.parkedBikes;document.getElementById('total').textContent=d.totalParked;
+  document.getElementById('carAvail').textContent=`${d.availableCarSlots} of ${d.carCapacity} spaces available`;
+  document.getElementById('bikeAvail').textContent=`${d.availableBikeSlots} of ${d.bikeCapacity} spaces available`;
+  document.getElementById('capacity').textContent=d.carCapacity+d.bikeCapacity;
+  const carInput=document.getElementById('carRate'),bikeInput=document.getElementById('bikeRate');
+  if(document.activeElement!==carInput)carInput.value=rates.carRatePerHour;
+  if(document.activeElement!==bikeInput)bikeInput.value=rates.bikeRatePerHour;
+  document.getElementById('activeCount').textContent=`${vehicles.length} ACTIVE`;
+  const body=document.getElementById('vehicleRows');
+  body.innerHTML=vehicles.length?vehicles.map(v=>`<tr><td><b>${esc(v.brand)} ${esc(v.model)}</b><br><span class="muted">${v.vehicleType}</span></td><td><b>${esc(v.numberPlate)}</b></td><td><span class="pill">${esc(v.slotNumber)}</span></td><td>${new Date(v.entryTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}<br><span class="muted">${new Date(v.entryTime).toLocaleDateString()}</span></td><td class="timer" data-entry="${v.entryTime}">${duration(v.entryTime)}</td><td><button class="small" onclick="checkout(${v.id})">Exit & pay</button></td></tr>`).join(''):'<tr><td colspan="6" class="empty">No vehicles are parked right now.</td></tr>';
+ }catch(e){notify(e.message)}
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.getElementById('entryForm').addEventListener('submit',async e=>{
+ e.preventDefault();const payload={vehicleType:document.getElementById('vehicleType').value,brand:document.getElementById('brand').value,model:document.getElementById('model').value,numberPlate:document.getElementById('plate').value};
+ try{const v=await api('/api/parking/entry',{method:'POST',body:JSON.stringify(payload)});notify(`Entry recorded. Allocated slot ${v.slotNumber}.`);e.target.reset();await refreshAll()}catch(err){notify(err.message)}
+});
+document.getElementById('rateForm').addEventListener('submit',async e=>{
+ e.preventDefault();try{await api('/api/settings/rates',{method:'PUT',body:JSON.stringify({carRatePerHour:Number(document.getElementById('carRate').value),bikeRatePerHour:Number(document.getElementById('bikeRate').value)})});notify('Parking rates updated.');await refreshAll()}catch(err){notify(err.message)}
+});
+async function checkout(id){
+ if(!confirm('Confirm vehicle exit and demo payment?'))return;
+ try{const result=await api(`/api/parking/${id}/checkout`,{method:'POST'});const r=result.record;alert(`PARKING BILL\nVehicle: ${r.numberPlate}\nSlot: ${r.slotNumber}\nDuration: ${r.durationMinutes} minutes\nBillable hours: ${result.billableHours}\nAmount: ${money(r.amount)}\n\nDemo payment marked complete.`);await refreshAll()}catch(e){notify(e.message)}
+}
+function tickClock(){document.querySelectorAll('.timer').forEach(el=>el.textContent=duration(el.dataset.entry));document.getElementById('clock').textContent=new Date().toLocaleString()}
+tickClock();setInterval(tickClock,10000);
+refreshAll();setInterval(refreshAll,30000);
+</script>
+</body></html>

@@ -11,7 +11,7 @@ A full-stack parking operations dashboard with **Vercel Serverless + Supabase / 
 - Supports **Supabase** (`SUPABASE_URL` + `SUPABASE_SECRET_KEY`), direct **PostgreSQL** (`POSTGRES_URL` / `DATABASE_URL` / `SPRING_DATASOURCE_URL`), and **H2** file database fallback locally
 
 ## Supabase Setup
-1. Copy `.env.example` to `.env` for local runs (never commit `.env`—it is gitignored).
+1. Create a local `.env` file (gitignored) with your Supabase keys (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL`) for local runs.
 2. Run [`supabase/schema.sql`](supabase/schema.sql) once in your **Supabase SQL Editor** to create `parking_records`, `parking_settings`, unique active-slot/plate indexes, and RLS policies.
 3. In **Vercel Project Settings -> Environment Variables**, add:
    - `SUPABASE_URL`

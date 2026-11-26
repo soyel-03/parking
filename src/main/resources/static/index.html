@@ -43,9 +43,7 @@ td{padding:13px 8px;border-bottom:1px solid #edf2f5}tr:last-child td{border-bott
  <div class="header-meta"><span class="db-badge" id="storageBadge">Checking storage…</span><div class="sub" id="clock"></div></div>
 </header>
 <main>
-<div class="notice" id="ephemeralNotice">
- <strong>Ephemeral Demo Storage Active:</strong> No PostgreSQL database is connected yet on this Vercel deployment, so data resets when serverless instances recycle. Add <code>POSTGRES_URL</code> or <code>DATABASE_URL</code> in your Vercel Project Environment Variables to enable persistent PostgreSQL storage.
-</div>
+<div class="notice" id="ephemeralNotice"></div>
 <div class="top"><div><h1>Parking overview</h1><div class="muted">Live occupancy, vehicle entry, persisted rates, and checkout history</div></div><button class="secondary" onclick="refreshAll()">↻ Refresh data</button></div>
 <section class="grid">
  <div class="card"><div class="stat-label">Cars parked</div><div class="stat" id="cars">—</div><div class="stat-note" id="carAvail">Loading capacity…</div></div>
@@ -107,9 +105,11 @@ function renderActiveRows(){
 function updateStorageBadge(mode){
  const badge=document.getElementById('storageBadge');
  const notice=document.getElementById('ephemeralNotice');
- if(mode==='postgresql'){badge.textContent='PostgreSQL Connected';badge.classList.remove('warn');notice.style.display='none'}
+ if(mode==='supabase'||mode==='supabase-postgres'){badge.textContent='Supabase Connected';badge.classList.remove('warn');notice.style.display='none'}
+ else if(mode==='postgresql'){badge.textContent='PostgreSQL Connected';badge.classList.remove('warn');notice.style.display='none'}
  else if(mode==='h2'){badge.textContent='H2 Database';badge.classList.remove('warn');notice.style.display='none'}
- else{badge.textContent='Ephemeral Demo Storage';badge.classList.add('warn');notice.style.display='block'}
+ else if(mode==='supabase-setup'){badge.textContent='Supabase Setup Needed';badge.classList.add('warn');notice.innerHTML='<strong>Supabase Connected — One-Time Table Setup Required:</strong> Run the SQL in <code>supabase/schema.sql</code> inside your Supabase SQL Editor, then click <b>Refresh data</b>.';notice.style.display='block'}
+ else{badge.textContent='Ephemeral Demo Storage';badge.classList.add('warn');notice.innerHTML='<strong>Ephemeral Demo Storage Active:</strong> Add <code>SUPABASE_URL</code> + <code>SUPABASE_SECRET_KEY</code> (or <code>POSTGRES_URL</code>) in your Vercel Project Environment Variables for persistent Supabase/PostgreSQL storage.';notice.style.display='block'}
 }
 async function refreshAll(){
  try{

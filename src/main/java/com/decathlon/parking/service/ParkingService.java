@@ -22,24 +22,31 @@ public class ParkingService {
 
     private final ParkingRecordRepository repo;
     private final ParkingSettingsRepository settingsRepo;
-    private final String storageMode;
+    private final SupabaseRestClient supabase;
+    private final boolean useSupabaseRest;
+    private final String jpaStorageMode;
     private final Object settingsLock = new Object();
 
     public ParkingService(
         ParkingRecordRepository repo,
         ParkingSettingsRepository settingsRepo,
+        SupabaseRestClient supabase,
         @Value("${spring.datasource.url:}") String datasourceUrl
     ) {
         this.repo = repo;
         this.settingsRepo = settingsRepo;
-        this.storageMode = datasourceUrl != null && datasourceUrl.toLowerCase(Locale.ROOT).contains("postgresql")
-            ? "postgresql"
-            : "h2";
+        this.supabase = supabase;
+        boolean explicitPostgres = datasourceUrl != null
+            && datasourceUrl.toLowerCase(Locale.ROOT).contains("postgresql");
+        this.useSupabaseRest = !explicitPostgres && supabase.isConfigured();
+        this.jpaStorageMode = explicitPostgres ? "postgresql" : "h2";
     }
 
     @PostConstruct
     void initSettings() {
-        getOrCreateSettings();
+        if (!useSupabaseRest) {
+            getOrCreateSettings();
+        }
     }
 
     private ParkingSettings getOrCreateSettings() {
@@ -66,6 +73,10 @@ public class ParkingService {
             throw new IllegalArgumentException("Vehicle type must be CAR or BIKE.");
         }
         String normalizedPlate = plate.trim().toUpperCase(Locale.ROOT);
+        if (useSupabaseRest) {
+            return supabase.enter(vehicleType, brand, model, normalizedPlate);
+        }
+
         if (repo.findFirstByNumberPlateIgnoreCaseAndStatus(normalizedPlate, "PARKED").isPresent()) {
             throw new IllegalArgumentException("This number plate already has an active parking session.");
         }
@@ -97,6 +108,9 @@ public class ParkingService {
 
     @Transactional
     public Map<String, Object> checkout(Long id) {
+        if (useSupabaseRest) {
+            return supabase.checkout(id);
+        }
         ParkingRecord r = repo.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Parking record not found."));
         if (!"PARKED".equals(r.getStatus())) {
@@ -126,16 +140,25 @@ public class ParkingService {
 
     @Transactional(readOnly = true)
     public List<ParkingRecord> active() {
+        if (useSupabaseRest) {
+            return supabase.active();
+        }
         return repo.findByStatusOrderByEntryTimeDesc("PARKED");
     }
 
     @Transactional(readOnly = true)
     public List<ParkingRecord> history() {
+        if (useSupabaseRest) {
+            return supabase.history();
+        }
         return repo.findTop50ByStatusOrderByExitTimeDesc("PAID");
     }
 
     @Transactional
     public Map<String, Object> dashboard() {
+        if (useSupabaseRest) {
+            return supabase.dashboard();
+        }
         ParkingSettings settings = getOrCreateSettings();
         long cars = repo.countByStatusAndVehicleType("PARKED", "CAR");
         long bikes = repo.countByStatusAndVehicleType("PARKED", "BIKE");
@@ -156,12 +179,22 @@ public class ParkingService {
         m.put("bikeRatePerHour", settings.getBikeRatePerHour());
         m.put("totalCheckouts", totalCheckouts);
         m.put("totalRevenue", totalRevenue);
-        m.put("storageMode", storageMode);
+        m.put("storageMode", jpaStorageMode);
         return m;
     }
 
     @Transactional
     public Map<String, Object> rates() {
+        if (useSupabaseRest) {
+            try {
+                return new LinkedHashMap<>(supabase.getOrCreateRates());
+            } catch (SupabaseRestClient.MissingTableException e) {
+                return Map.of(
+                    "carRatePerHour", new BigDecimal("30.00"),
+                    "bikeRatePerHour", new BigDecimal("15.00")
+                );
+            }
+        }
         ParkingSettings settings = getOrCreateSettings();
         return Map.of(
             "carRatePerHour", settings.getCarRatePerHour(),
@@ -174,6 +207,9 @@ public class ParkingService {
         if (car == null || bike == null || car.signum() < 0 || bike.signum() < 0) {
             throw new IllegalArgumentException("Rates must be zero or greater.");
         }
+        if (useSupabaseRest) {
+            return supabase.updateRates(car, bike);
+        }
         ParkingSettings settings = getOrCreateSettings();
         settings.setCarRatePerHour(car.setScale(2, RoundingMode.HALF_UP));
         settings.setBikeRatePerHour(bike.setScale(2, RoundingMode.HALF_UP));
@@ -183,6 +219,16 @@ public class ParkingService {
     }
 
     public String storageMode() {
-        return storageMode;
+        return useSupabaseRest ? supabase.storageMode() : jpaStorageMode;
+    }
+
+    public Map<String, Object> publicConfig() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("supabaseConfigured", supabase.isConfigured());
+        cfg.put("supabaseUrl", supabase.getSupabaseUrl().isBlank() ? null : supabase.getSupabaseUrl());
+        cfg.put("supabasePublishableKey", supabase.getPublishableKey().isBlank() ? null : supabase.getPublishableKey());
+        cfg.put("supabaseJwksUrl", supabase.getJwksUrl().isBlank() ? null : supabase.getJwksUrl());
+        cfg.put("storageMode", storageMode());
+        return cfg;
     }
 }

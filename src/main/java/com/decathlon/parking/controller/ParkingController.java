@@ -2,6 +2,7 @@ package com.decathlon.parking.controller;
 
 import com.decathlon.parking.model.ParkingRecord;
 import com.decathlon.parking.service.ParkingService;
+import com.decathlon.parking.service.SupabaseRestClient;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.http.*;
@@ -33,7 +34,14 @@ public class ParkingController {
 
     @GetMapping("/health")
     public Map<String, Object> health() {
-        return Map.of("status", "UP", "storageMode", service.storageMode());
+        String mode = service.storageMode();
+        String status = "supabase-setup".equals(mode) ? "SETUP_REQUIRED" : "UP";
+        return Map.of("status", status, "storageMode", mode);
+    }
+
+    @GetMapping("/config")
+    public Map<String, Object> config() {
+        return service.publicConfig();
     }
 
     @PostMapping("/parking/entry")
@@ -76,6 +84,11 @@ public class ParkingController {
     public ResponseEntity<Map<String, String>> badRequest(RuntimeException ex) {
         String msg = ex.getMessage() != null ? ex.getMessage() : "Invalid request.";
         return ResponseEntity.badRequest().body(Map.of("error", msg));
+    }
+
+    @ExceptionHandler(SupabaseRestClient.MissingTableException.class)
+    public ResponseEntity<Map<String, String>> setupRequired(SupabaseRestClient.MissingTableException ex) {
+        return ResponseEntity.status(503).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
